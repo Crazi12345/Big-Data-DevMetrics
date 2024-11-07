@@ -4,3 +4,7 @@ A Big Data Project using different technologies and data sources to gain trends 
 
 
 !
+
+
+
+Patrick be like --> (╯°□°)╯︵ ┻━┻
