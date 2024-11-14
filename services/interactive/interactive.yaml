@@ -1,0 +1,38 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: interactive-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: interactive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: interactive
+  template:
+    metadata:
+      labels:
+        app: interactive
+    spec:
+      containers:
+        - name: interactive
+          image: registry.gitlab.sdu.dk/jah/bigdatarepo/interactive:latest
+          imagePullPolicy: Always
+          command: ["sleep", "infinity"]
+          volumeMounts:
+            - name: interactive-storage
+              mountPath: /root/code
+      volumes:
+        - name: interactive-storage
+          persistentVolumeClaim:
+            claimName: interactive-pvc
