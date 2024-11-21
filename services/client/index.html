@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer World Heatmap</title>
+    
+    <!-- Leaflet CSS and JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Marker Cluster Group -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+    <style>
+        #map {
+            height: 500px;
+            width: 100%;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Developer Distribution Simulation</h1>
+    <div id="map"></div>
+
+    <script>
+        // Initialize the map
+        const map = L.map('map').setView([20, 0], 2);
+
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+
+        // Predefined regions and programming languages
+        const regions = [
+            { name: "North America", latRange: [30, 50], lonRange: [-125, -70] },
+            { name: "South America", latRange: [-30, 0], lonRange: [-80, -35] },
+            { name: "Europe", latRange: [40, 60], lonRange: [-10, 30] },
+            { name: "Asia", latRange: [10, 50], lonRange: [60, 140] },
+            { name: "Australia", latRange: [-40, -10], lonRange: [110, 155] },
+            { name: "Africa", latRange: [-30, 10], lonRange: [-20, 50] }
+        ];
+        const programmingLanguages = ["Python", "JavaScript", "Java", "C#", "Ruby", "Go", "C++", "Swift", "Kotlin", "PHP"];
+
+        // Generate random individuals
+        const individuals = [];
+        for (let i = 0; i < 100; i++) {
+            const region = regions[Math.floor(Math.random() * regions.length)];
+            const language = programmingLanguages[Math.floor(Math.random() * programmingLanguages.length)];
+            const lat = Math.random() * (region.latRange[1] - region.latRange[0]) + region.latRange[0];
+            const lon = Math.random() * (region.lonRange[1] - region.lonRange[0]) + region.lonRange[0];
+            individuals.push({ region: region.name, language, coordinates: [lat, lon] });
+        }
+
+        // Initialize MarkerClusterGroup
+        const markers = L.markerClusterGroup();
+
+        // Add individual markers to the cluster group
+        individuals.forEach(individual => {
+            const marker = L.marker(individual.coordinates)
+                .bindPopup(`<b>Region:</b> ${individual.region}<br><b>Programming Language:</b> ${individual.language}`);
+            markers.addLayer(marker);
+        });
+
+        // Add cluster group to the map
+        map.addLayer(markers);
+    </script>
+</body>
+</html>
