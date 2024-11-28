@@ -1,3 +1,5 @@
+#!/bin/bash
+
 kubectl exec -it spark-master-0 -- bash -c 'export SPARK_HOME=/opt/bitnami/spark && $SPARK_HOME/bin/spark-submit \
     --master spark://spark-master-svc:7077 \
     --deploy-mode client \
