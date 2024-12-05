@@ -8,6 +8,16 @@ master:
     requests:
       cpu: 1
       memory: 1Gi
+  extraVolumes:
+    - name: spark-jars
+      configMap:
+        name: spark-jars
+  extraVolumeMounts:
+    - mountPath: /opt/bitnami/spark/custom-jars
+      name: spark-jars
+  extraEnvVars:
+    - name: SPARK_HOME
+      value: /opt/bitnami/spark
 worker:
   replicaCount: 2
   resources:
@@ -17,3 +27,13 @@ worker:
     requests:
       cpu: 1
       memory: 1Gi
+  extraVolumes:
+    - name: spark-jars
+      configMap:
+        name: spark-jars
+  extraVolumeMounts:
+    - mountPath: /opt/bitnami/spark/custom-jars
+      name: spark-jars
+  extraEnvVars:
+    - name: SPARK_HOME
+      value: /opt/bitnami/spark
