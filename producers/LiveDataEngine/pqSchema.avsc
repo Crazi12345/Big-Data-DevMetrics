@@ -1,0 +1,22 @@
+  {  "type": "record",
+    "name": "Question",
+    "fields": [
+      { "name": "Id", "type": "int" },
+      { "name": "PostTypeId", "type": "int" },
+      { "name": "AcceptedAnswerId", "type": "int" },
+      { "name": "CreationDate", "type": "string" },
+      { "name": "Score", "type": "int" },
+      { "name": "ViewCount", "type": "int" },
+      { "name": "Body", "type": "string" },
+      { "name": "OwnerUserId", "type": "int" },
+      { "name": "LastEditorUserId", "type": "int" },
+      { "name": "LastEditDate", "type": "string" },
+      { "name": "LastActivityDate", "type": "string" },
+      { "name": "Title", "type": "string" },
+      { "name": "Tags", "type": "string" },
+      { "name": "AnswerCount", "type": "int" },
+      { "name": "CommentCount", "type": "int" },
+      { "name": "FavoriteCount", "type": "int" },
+      { "name": "ContentLicense", "type": "string" }
+    ]
+  }
