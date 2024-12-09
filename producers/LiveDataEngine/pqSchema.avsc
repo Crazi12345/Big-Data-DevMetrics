@@ -1,4 +1,5 @@
-  {  "type": "record",
+ {
+     "type": "record",
     "name": "Question",
     "fields": [
       { "name": "Id", "type": "int" },

@@ -4,28 +4,54 @@ import (
 	"bufio"
 	"encoding/xml"
 	"fmt"
+	"github.com/fatih/structs"
+	"github.com/linkedin/goavro/v2"
 	"io"
 	"log"
 	"os"
 	"os/exec"
-	"github.com/fatih/structs"
-	"github.com/linkedin/goavro/v2"
 )
+
+/*
+type Post struct {
+	Id                    int    `xml:"Id,attr"`
+	PostTypeId            int    `xml:"PostTypeId,attr"`
+	ParentId              int    `xml:"ParentId,attr"`
+	CreationDate          string `xml:"CreationDate,attr"`
+	Score                 int    `xml:"Score,attr"`
+	OwnerUserId           int    `xml:"OwnerUserId,attr"`
+	LastEditorUserId      int    `xml:"LastEditorUserId,attr"`
+	LastEditorDisplayName string `xml:"LastEditorDisplayName,attr"`
+	LastEditDate          string `xml:"LastEditDate,attr"`
+	LastActivityDate      string `xml:"LastActivityDate,attr"`
+	CommentCount          int    `xml:"CommentCount,attr"`
+	CommunityOwnedDate    string `xml:"CommunityOwnedDate,attr"`
+	ContentLicense        string `xml:"ContentLicense,attr"`
+}
+*/
 
 type Post struct {
 	Id                    int    `xml:"Id,attr" avro:"Id"`
-	PostTypeId            int    `xml:"PostTypeId,attr" avro:"post_type_id"`
-	ParentId              int    `xml:"ParentId,attr" avro:"parent_id"`
-	CreationDate          string `xml:"CreationDate,attr" avro:"creation_date"`
+	PostTypeId            int    `xml:"PostTypeId,attr" avro:"postTypeId"`
+	ParentId              int    `xml:"ParentId,attr" avro:"parentId"`
+	AcceptedAnswerId      int    `xml:"AcceptedAnswerId,attr" avro:"acceptedAnswerId"` // New field
+	CreationDate          string `xml:"CreationDate,attr" avro:"creationDate"`
 	Score                 int    `xml:"Score,attr" avro:"score"`
-	OwnerUserId           int    `xml:"OwnerUserId,attr" avro:"owner_user_id"`
-	LastEditorUserId      int    `xml:"LastEditorUserId,attr" avro:"last_editor_user_id"`
-	LastEditorDisplayName string `xml:"LastEditorDisplayName,attr" avro:"last_editor_display_name"`
-	LastEditDate          string `xml:"LastEditDate,attr" avro:"last_edit_date"`
-	LastActivityDate      string `xml:"LastActivityDate,attr" avro:"last_activity_date"`
-	CommentCount          int    `xml:"CommentCount,attr" avro:"comment_count"`
-	CommunityOwnedDate    string `xml:"CommunityOwnedDate,attr" avro:"community_owned_date"`
-	ContentLicense        string `xml:"ContentLicense,attr" avro:"content_license"`
+	ViewCount             int    `xml:"ViewCount,attr" avro:"viewCount"` // New field
+	Body                  string `xml:"Body,attr" avro:"body"`
+	OwnerUserId           int    `xml:"OwnerUserId,attr" avro:"ownerUserId"`
+	OwnerDisplayName      string `xml:"OwnerDisplayName,attr" avro:"ownerDisplayName"` // New field
+	LastEditorUserId      int    `xml:"LastEditorUserId,attr" avro:"lastEditorUserId"`
+	LastEditorDisplayName string `xml:"LastEditorDisplayName,attr" avro:"lastEditorDisplayName"`
+	LastEditDate          string `xml:"LastEditDate,attr" avro:"lastEditDate"`
+	LastActivityDate      string `xml:"LastActivityDate,attr" avro:"lastActivityDate"`
+	Title                 string `xml:"Title,attr" avro:"title"`             // New field
+	Tags                  string `xml:"Tags,attr" avro:"tags"`               // New field
+	AnswerCount           int    `xml:"AnswerCount,attr" avro:"answerCount"` // New field
+	CommentCount          int    `xml:"CommentCount,attr" avro:"commentCount"`
+	FavoriteCount         int    `xml:"FavoriteCount,attr" avro:"favoriteCount"` // New field
+	CommunityOwnedDate    string `xml:"CommunityOwnedDate,attr" avro:"communityOwnedDate"`
+	ContentLicense        string `xml:"ContentLicense,attr" avro:"contentLicense"`
 }
 
 func check(e error, message string) {
@@ -94,33 +120,47 @@ func main() {
 	file, err := os.OpenFile("/run/media/tired_atlas/Maxtor/test.xml", os.O_CREATE, 0644)
 	check(err, "Could not open file")
 	reader := bufio.NewReader(file)
-	avroSchema, err := os.ReadFile("/home/tired_atlas/Projects/Big-Data-DevMetrics/producers/LiveDataEngine/postSchema.avsc")
 	check(err, "unable to parse schema") // Handle the error properly
+
+	questionSchema, err := os.ReadFile("/home/tired_atlas/Projects/Big-Data-DevMetrics/producers/LiveDataEngine/pqSchema.avsc")
+	postSchema, err := os.ReadFile("/home/tired_atlas/Projects/Big-Data-DevMetrics/producers/LiveDataEngine/postSchema.avsc")
 
 	reader.ReadLine()
 	reader.ReadLine()
+	reader.ReadLine()
 	line, _, _ := reader.ReadLine()
+	fmt.Println(string(line[:]))
 	data := &Post{}
 	error := xml.Unmarshal(line, data)
 	if nil != error {
 		fmt.Println("Error unmarshalling from XML", err)
 		return
 	}
-    ocfFile, err := os.Create("pp.avro")
+	ocfFile, err := os.Create("pp.avro")
+	cfFile, err := os.Create("pq.avro")
 	check(err, "cannot create Avro file")
 	defer ocfFile.Close()
 
-	writer, err := goavro.NewOCFWriter(goavro.OCFConfig{
+	postWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
 		W:      ocfFile,
-		Schema: string(avroSchema), // Use string(avroSchema) here
+		Schema: string(postSchema), // Use string(avroSchema) here
 	})
+	questionWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
+		W:      cfFile,
+		Schema: string(questionSchema), // Use string(avroSchema) here
+	})
+
 	check(err, "cannot create OCF writer")
 
 	native := structs.Map(data)
 	check(err, "cannot convert to map")
 
 	// Append the data to the OCF writer
-	err = writer.Append([]map[string]interface{}{native})
+	if data.PostTypeId == 1 {
+		err = questionWriter.Append([]map[string]interface{}{native})
+	} else {
+		err = postWriter.Append([]map[string]interface{}{native})
+	}
 	check(err, "cannot append data to OCF writer")
 	// You can write this to a file, send it over a network, etc.
 }
