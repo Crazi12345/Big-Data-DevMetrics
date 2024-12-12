@@ -2,54 +2,40 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/xml"
 	"fmt"
-	"github.com/fatih/structs"
-	"github.com/linkedin/goavro/v2"
 	"io"
 	"log"
 	"os"
 	"os/exec"
-)
+	"time"
 
-/*
-type Post struct {
-	Id                    int    `xml:"Id,attr"`
-	PostTypeId            int    `xml:"PostTypeId,attr"`
-	ParentId              int    `xml:"ParentId,attr"`
-	CreationDate          string `xml:"CreationDate,attr"`
-	Score                 int    `xml:"Score,attr"`
-	OwnerUserId           int    `xml:"OwnerUserId,attr"`
-	LastEditorUserId      int    `xml:"LastEditorUserId,attr"`
-	LastEditorDisplayName string `xml:"LastEditorDisplayName,attr"`
-	LastEditDate          string `xml:"LastEditDate,attr"`
-	LastActivityDate      string `xml:"LastActivityDate,attr"`
-	CommentCount          int    `xml:"CommentCount,attr"`
-	CommunityOwnedDate    string `xml:"CommunityOwnedDate,attr"`
-	ContentLicense        string `xml:"ContentLicense,attr"`
-}
-*/
+	"github.com/fatih/structs"
+	"github.com/linkedin/goavro/v2"
+	"github.com/segmentio/kafka-go"
+)
 
 type Post struct {
 	Id                    int    `xml:"Id,attr" avro:"Id"`
 	PostTypeId            int    `xml:"PostTypeId,attr" avro:"postTypeId"`
 	ParentId              int    `xml:"ParentId,attr" avro:"parentId"`
-	AcceptedAnswerId      int    `xml:"AcceptedAnswerId,attr" avro:"acceptedAnswerId"` // New field
+	AcceptedAnswerId      int    `xml:"AcceptedAnswerId,attr" avro:"acceptedAnswerId"`
 	CreationDate          string `xml:"CreationDate,attr" avro:"creationDate"`
 	Score                 int    `xml:"Score,attr" avro:"score"`
-	ViewCount             int    `xml:"ViewCount,attr" avro:"viewCount"` // New field
+	ViewCount             int    `xml:"ViewCount,attr" avro:"viewCount"`
 	Body                  string `xml:"Body,attr" avro:"body"`
 	OwnerUserId           int    `xml:"OwnerUserId,attr" avro:"ownerUserId"`
-	OwnerDisplayName      string `xml:"OwnerDisplayName,attr" avro:"ownerDisplayName"` // New field
+	OwnerDisplayName      string `xml:"OwnerDisplayName,attr" avro:"ownerDisplayName"`
 	LastEditorUserId      int    `xml:"LastEditorUserId,attr" avro:"lastEditorUserId"`
 	LastEditorDisplayName string `xml:"LastEditorDisplayName,attr" avro:"lastEditorDisplayName"`
 	LastEditDate          string `xml:"LastEditDate,attr" avro:"lastEditDate"`
 	LastActivityDate      string `xml:"LastActivityDate,attr" avro:"lastActivityDate"`
-	Title                 string `xml:"Title,attr" avro:"title"`             // New field
-	Tags                  string `xml:"Tags,attr" avro:"tags"`               // New field
-	AnswerCount           int    `xml:"AnswerCount,attr" avro:"answerCount"` // New field
+	Title                 string `xml:"Title,attr" avro:"title"`
+	Tags                  string `xml:"Tags,attr" avro:"tags"`
+	AnswerCount           int    `xml:"AnswerCount,attr" avro:"answerCount"`
 	CommentCount          int    `xml:"CommentCount,attr" avro:"commentCount"`
-	FavoriteCount         int    `xml:"FavoriteCount,attr" avro:"favoriteCount"` // New field
+	FavoriteCount         int    `xml:"FavoriteCount,attr" avro:"favoriteCount"`
 	CommunityOwnedDate    string `xml:"CommunityOwnedDate,attr" avro:"communityOwnedDate"`
 	ContentLicense        string `xml:"ContentLicense,attr" avro:"contentLicense"`
 }
@@ -60,21 +46,6 @@ func check(e error, message string) {
 	}
 }
 
-func saveToFile(filename string, data []byte) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Then write the Avro data
-	_, err = file.Write(data)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 func popLine(f *os.File) ([]byte, error) {
 	// Use tail to get the first line from the file
 	cmd := exec.Command("tail", "-n", "1", f.Name())
@@ -115,52 +86,72 @@ func popLine(f *os.File) ([]byte, error) {
 	return line, nil
 }
 
+func sendKafkaMessage(text string) {
+
+	topic := "INGESTION"
+	partition := 0
+
+	conn, err := kafka.DialLeader(context.Background(), "tcp", "kafka:9092", topic, partition)
+	if err != nil {
+		log.Fatal("failed to dial leader:", err)
+	}
+
+	conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	_, err = conn.WriteMessages(
+		kafka.Message{Value: []byte(`{"Nikolaj": "Wonder Why!"}`)},
+		kafka.Message{Value: []byte(`{"Katrine": "C# is better!"}`)},
+		kafka.Message{Value: []byte(`{"Oliver": "Not with this library!"}`)},
+	)
+	if err != nil {
+		log.Fatal("failed to write messages:", err)
+	}
+
+	if err := conn.Close(); err != nil {
+		log.Fatal("failed to close writer:", err)
+	}
+}
 func main() {
 
-	file, err := os.OpenFile("/run/media/tired_atlas/Maxtor/test.xml", os.O_CREATE, 0644)
-	check(err, "Could not open file")
-	reader := bufio.NewReader(file)
+	file, err := os.OpenFile("/run/media/tired_atlas/Maxtor/test.xml", os.O_CREATE|os.O_RDWR, 0644)
 	check(err, "unable to parse schema") // Handle the error properly
 
-	questionSchema, err := os.ReadFile("/home/tired_atlas/Projects/Big-Data-DevMetrics/producers/LiveDataEngine/pqSchema.avsc")
-	postSchema, err := os.ReadFile("/home/tired_atlas/Projects/Big-Data-DevMetrics/producers/LiveDataEngine/postSchema.avsc")
-
-	reader.ReadLine()
-	reader.ReadLine()
-	reader.ReadLine()
-	line, _, _ := reader.ReadLine()
-	fmt.Println(string(line[:]))
-	data := &Post{}
-	error := xml.Unmarshal(line, data)
-	if nil != error {
-		fmt.Println("Error unmarshalling from XML", err)
-		return
-	}
+	sendKafkaMessage("test")
+	questionSchema, err := os.ReadFile("pqSchema.avsc")
+	postSchema, err := os.ReadFile("postSchema.avsc")
 	ocfFile, err := os.Create("pp.avro")
 	cfFile, err := os.Create("pq.avro")
 	check(err, "cannot create Avro file")
 	defer ocfFile.Close()
+	for i := 0; i < 100; i++ {
+		line, _ := popLine(file)
 
-	postWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
-		W:      ocfFile,
-		Schema: string(postSchema), // Use string(avroSchema) here
-	})
-	questionWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
-		W:      cfFile,
-		Schema: string(questionSchema), // Use string(avroSchema) here
-	})
+		fmt.Println(string(line[:]))
+		data := &Post{}
+		error := xml.Unmarshal(line, data)
+		if nil != error {
+			fmt.Println("Error unmarshalling from XML", err)
+			return
+		}
+		postWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
+			W:      ocfFile,
+			Schema: string(postSchema),
+		})
+		questionWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
+			W:      cfFile,
+			Schema: string(questionSchema),
+		})
 
-	check(err, "cannot create OCF writer")
+		check(err, "cannot create OCF writer")
 
-	native := structs.Map(data)
-	check(err, "cannot convert to map")
+		native := structs.Map(data)
+		check(err, "cannot convert to map")
 
-	// Append the data to the OCF writer
-	if data.PostTypeId == 1 {
-		err = questionWriter.Append([]map[string]interface{}{native})
-	} else {
-		err = postWriter.Append([]map[string]interface{}{native})
+		// Append the data to the OCF writer
+		if data.PostTypeId == 1 {
+			err = questionWriter.Append([]map[string]interface{}{native})
+		} else {
+			err = postWriter.Append([]map[string]interface{}{native})
+		}
+		check(err, "cannot append data to OCF writer")
 	}
-	check(err, "cannot append data to OCF writer")
-	// You can write this to a file, send it over a network, etc.
 }

@@ -1,0 +1,8 @@
+{
+    "name": "Live Data Ingester",
+    "image": "mcr.microsoft.com/devcontainers/go:1-1.22-bookworm",
+    "features": {
+        "ghcr.io/duduribeiro/devcontainer-features/neovim:1": {},
+        "ghcr.io/devcontainers-extra/features/wget-apt-get:1": {}
+    }
+}
