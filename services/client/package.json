@@ -1,0 +1,15 @@
+{
+    "name": "client",
+    "version": "1.0.0",
+    "description": "A simple JavaScript application",
+    "main": "client.js",
+    "scripts": {
+        "start": "node client.js"
+    },
+    "dependencies": {
+        "express": "^4.21.1",
+        "heatmap.js": "^2.0.5",
+        "leaflet": "^1.9.4",
+        "leaflet.markercluster": "^1.5.3"
+    }
+}

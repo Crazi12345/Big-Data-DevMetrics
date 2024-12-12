@@ -28,7 +28,7 @@ spec:
         - name: redpanda
           image: redpandadata/console:v2.7.0
           ports:
-            - containerPort: 8080
+            - containerPort: 8081
           envFrom:
             - configMapRef:
                 name: redpanda-config
