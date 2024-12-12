@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -17,27 +18,27 @@ import (
 )
 
 type Post struct {
-	Id                    int    `xml:"Id,attr" avro:"Id"`
-	PostTypeId            int    `xml:"PostTypeId,attr" avro:"postTypeId"`
-	ParentId              int    `xml:"ParentId,attr" avro:"parentId"`
-	AcceptedAnswerId      int    `xml:"AcceptedAnswerId,attr" avro:"acceptedAnswerId"`
-	CreationDate          string `xml:"CreationDate,attr" avro:"creationDate"`
-	Score                 int    `xml:"Score,attr" avro:"score"`
-	ViewCount             int    `xml:"ViewCount,attr" avro:"viewCount"`
-	Body                  string `xml:"Body,attr" avro:"body"`
-	OwnerUserId           int    `xml:"OwnerUserId,attr" avro:"ownerUserId"`
-	OwnerDisplayName      string `xml:"OwnerDisplayName,attr" avro:"ownerDisplayName"`
-	LastEditorUserId      int    `xml:"LastEditorUserId,attr" avro:"lastEditorUserId"`
-	LastEditorDisplayName string `xml:"LastEditorDisplayName,attr" avro:"lastEditorDisplayName"`
-	LastEditDate          string `xml:"LastEditDate,attr" avro:"lastEditDate"`
-	LastActivityDate      string `xml:"LastActivityDate,attr" avro:"lastActivityDate"`
-	Title                 string `xml:"Title,attr" avro:"title"`
-	Tags                  string `xml:"Tags,attr" avro:"tags"`
-	AnswerCount           int    `xml:"AnswerCount,attr" avro:"answerCount"`
-	CommentCount          int    `xml:"CommentCount,attr" avro:"commentCount"`
-	FavoriteCount         int    `xml:"FavoriteCount,attr" avro:"favoriteCount"`
-	CommunityOwnedDate    string `xml:"CommunityOwnedDate,attr" avro:"communityOwnedDate"`
-	ContentLicense        string `xml:"ContentLicense,attr" avro:"contentLicense"`
+	Id                    int    `json:"Id" xml:"Id,attr" avro:"Id"`
+	PostTypeId            int    `json:"PostTypeId" xml:"PostTypeId,attr" avro:"postTypeId"`
+	ParentId              int    `json:"ParentId" xml:"ParentId,attr" avro:"parentId"`
+	AcceptedAnswerId      int    `json:"AcceptedAnswerId" xml:"AcceptedAnswerId,attr" avro:"acceptedAnswerId"`
+	CreationDate          string `json:"CreationDate" xml:"CreationDate,attr" avro:"creationDate"`
+	Score                 int    `json:"Score" xml:"Score,attr" avro:"score"`
+	ViewCount             int    `json:"ViewCount" xml:"ViewCount,attr" avro:"viewCount"`
+	Body                  string `json:"Body" xml:"Body,attr" avro:"body"`
+	OwnerUserId           int    `json:"OwnerUserId" xml:"OwnerUserId,attr" avro:"ownerUserId"`
+	OwnerDisplayName      string `json:"OwnerDisplayName" xml:"OwnerDisplayName,attr" avro:"ownerDisplayName"`
+	LastEditorUserId      int    `json:"LastEditorUserId" xml:"LastEditorUserId,attr" avro:"lastEditorUserId"`
+	LastEditorDisplayName string `json:"LastEditorDisplayName" xml:"LastEditorDisplayName,attr" avro:"lastEditorDisplayName"`
+	LastEditDate          string `json:"LastEditDate" xml:"LastEditDate,attr" avro:"lastEditDate"`
+	LastActivityDate      string `json:"LastActivityDate" xml:"LastActivityDate,attr" avro:"lastActivityDate"`
+	Title                 string `json:"Title" xml:"Title,attr" avro:"title"`
+	Tags                  string `json:"Tags" xml:"Tags,attr" avro:"tags"`
+	AnswerCount           int    `json:"AnswerCount" xml:"AnswerCount,attr" avro:"answerCount"`
+	CommentCount          int    `json:"CommentCount" xml:"CommentCount,attr" avro:"commentCount"`
+	FavoriteCount         int    `json:"FavoriteCount" xml:"FavoriteCount,attr" avro:"favoriteCount"`
+	CommunityOwnedDate    string `json:"CommunityOwnedDate" xml:"CommunityOwnedDate,attr" avro:"communityOwnedDate"`
+	ContentLicense        string `json:"ContentLicense" xml:"ContentLicense,attr" avro:"contentLicense"`
 }
 
 func check(e error, message string) {
@@ -80,7 +81,29 @@ func popLine(f *os.File) ([]byte, error) {
 
 	err = f.Truncate(newSize)
 	check(err, "truncating failed")
-
+	type Post struct {
+		Id                    int    `json:"Id" xml:"Id,attr" avro:"Id"`
+		PostTypeId            int    `json:"PostTypeId" xml:"PostTypeId,attr" avro:"postTypeId"`
+		ParentId              int    `json:"ParentId" xml:"ParentId,attr" avro:"parentId"`
+		AcceptedAnswerId      int    `json:"AcceptedAnswerId" xml:"AcceptedAnswerId,attr" avro:"acceptedAnswerId"`
+		CreationDate          string `json:"CreationDate" xml:"CreationDate,attr" avro:"creationDate"`
+		Score                 int    `json:"Score" xml:"Score,attr" avro:"score"`
+		ViewCount             int    `json:"ViewCount" xml:"ViewCount,attr" avro:"viewCount"`
+		Body                  string `json:"Body" xml:"Body,attr" avro:"body"`
+		OwnerUserId           int    `json:"OwnerUserId" xml:"OwnerUserId,attr" avro:"ownerUserId"`
+		OwnerDisplayName      string `json:"OwnerDisplayName" xml:"OwnerDisplayName,attr" avro:"ownerDisplayName"`
+		LastEditorUserId      int    `json:"LastEditorUserId" xml:"LastEditorUserId,attr" avro:"lastEditorUserId"`
+		LastEditorDisplayName string `json:"LastEditorDisplayName" xml:"LastEditorDisplayName,attr" avro:"lastEditorDisplayName"`
+		LastEditDate          string `json:"LastEditDate" xml:"LastEditDate,attr" avro:"lastEditDate"`
+		LastActivityDate      string `json:"LastActivityDate" xml:"LastActivityDate,attr" avro:"lastActivityDate"`
+		Title                 string `json:"Title" xml:"Title,attr" avro:"title"`
+		Tags                  string `json:"Tags" xml:"Tags,attr" avro:"tags"`
+		AnswerCount           int    `json:"AnswerCount" xml:"AnswerCount,attr" avro:"answerCount"`
+		CommentCount          int    `json:"CommentCount" xml:"CommentCount,attr" avro:"commentCount"`
+		FavoriteCount         int    `json:"FavoriteCount" xml:"FavoriteCount,attr" avro:"favoriteCount"`
+		CommunityOwnedDate    string `json:"CommunityOwnedDate" xml:"CommunityOwnedDate,attr" avro:"communityOwnedDate"`
+		ContentLicense        string `json:"ContentLicense" xml:"ContentLicense,attr" avro:"contentLicense"`
+	}
 	err = f.Sync()
 	check(err, "syncing failed")
 	return line, nil
@@ -90,6 +113,7 @@ func sendKafkaMessage(data []byte, topic string) {
 
 	partition := 0
 
+	//file, err := os.ReadFile("pp.avro")
 	//log.Println(data)
 	conn, err := kafka.DialLeader(context.Background(), "tcp", "kafka:9092", topic, partition)
 	if err != nil {
@@ -100,7 +124,6 @@ func sendKafkaMessage(data []byte, topic string) {
 	_, err = conn.WriteMessages(
 		kafka.Message{Value: data},
 	)
-	log.Println(data)
 	if err != nil {
 		log.Fatal("failed to write messages:", err)
 	}
@@ -122,9 +145,9 @@ func main() {
 	cfFile, err := os.Create("pq.avro")
 	check(err, "cannot create Avro file")
 	defer ocfFile.Close()
-	postCodec, err := goavro.NewCodec(string(postSchema))
+	//postCodec, err := goavro.NewCodec(string(postSchema))
 	check(err, "Could not create Codec")
-	questionCodec, err := goavro.NewCodec(string(questionSchema))
+	//questionCodec, err := goavro.NewCodec(string(questionSchema))
 	check(err, "Could not create Codec")
 	postWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
 		W:      ocfFile,
@@ -145,21 +168,24 @@ func main() {
 			return
 		}
 
+		jsonData, err := json.Marshal(data)
+		check(err, "could not make to jj")
 		native := structs.Map(data)
 		check(err, "cannot convert to map")
 
+		log.Println(data.Tags)
 		// Append the data to the OCF writer
 		if data.PostTypeId == 1 {
 			err = questionWriter.Append([]map[string]interface{}{native})
-			binary, err := questionCodec.BinaryFromNative(nil, structs.Map(data))
+			//binary, err := questionCodec.BinaryFromNative(nil, structs.Map(data))
 			check(err, "could not convert QuestionData")
-			sendKafkaMessage(binary, "INGESTION")
+			sendKafkaMessage(jsonData, "INGESTION")
 		} else {
 			err = postWriter.Append([]map[string]interface{}{native})
 
-			binary, err := postCodec.BinaryFromNative(nil, structs.Map(data))
+			//binary, err := postCodec.BinaryFromNative(nil, structs.Map(data))
 			check(err, "could not convert PostData")
-			sendKafkaMessage(binary, "ingestion2")
+			sendKafkaMessage(jsonData, "ingestion2")
 		}
 		check(err, "cannot append data to OCF writer")
 		// You can write this to a file, send it over a network, etc.
