@@ -112,37 +112,36 @@ func sendKafkaMessage(text string) {
 }
 func main() {
 
-	file, err := os.OpenFile("/run/media/tired_atlas/Maxtor/test.xml", os.O_CREATE|os.O_RDWR, 0644)
+	file, err := os.OpenFile("test.xml", os.O_CREATE|os.O_RDWR, 0644)
+	check(err, "Could not open file")
 	check(err, "unable to parse schema") // Handle the error properly
 
-	sendKafkaMessage("test")
+//	sendKafkaMessage("test")
 	questionSchema, err := os.ReadFile("pqSchema.avsc")
 	postSchema, err := os.ReadFile("postSchema.avsc")
 	ocfFile, err := os.Create("pp.avro")
 	cfFile, err := os.Create("pq.avro")
 	check(err, "cannot create Avro file")
 	defer ocfFile.Close()
+    postWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
+        W:      ocfFile,
+        Schema: string(postSchema), // Use string(avroSchema) here
+    })
+    questionWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
+        W:      cfFile,
+        Schema: string(questionSchema), // Use string(avroSchema) here
+    })
+
 	for i := 0; i < 100; i++ {
 		line, _ := popLine(file)
 
-		fmt.Println(string(line[:]))
+//		fmt.Println(string(line[:]))
 		data := &Post{}
 		error := xml.Unmarshal(line, data)
 		if nil != error {
 			fmt.Println("Error unmarshalling from XML", err)
 			return
 		}
-		postWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
-			W:      ocfFile,
-			Schema: string(postSchema),
-		})
-		questionWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
-			W:      cfFile,
-			Schema: string(questionSchema),
-		})
-
-		check(err, "cannot create OCF writer")
-
 		native := structs.Map(data)
 		check(err, "cannot convert to map")
 
@@ -153,5 +152,6 @@ func main() {
 			err = postWriter.Append([]map[string]interface{}{native})
 		}
 		check(err, "cannot append data to OCF writer")
+		// You can write this to a file, send it over a network, etc.
 	}
 }
