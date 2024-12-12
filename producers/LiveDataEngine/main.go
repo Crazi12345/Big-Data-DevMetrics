@@ -86,11 +86,11 @@ func popLine(f *os.File) ([]byte, error) {
 	return line, nil
 }
 
-func sendKafkaMessage(text string) {
+func sendKafkaMessage(data []byte, topic string) {
 
-	topic := "INGESTION"
 	partition := 0
 
+	//log.Println(data)
 	conn, err := kafka.DialLeader(context.Background(), "tcp", "kafka:9092", topic, partition)
 	if err != nil {
 		log.Fatal("failed to dial leader:", err)
@@ -98,17 +98,16 @@ func sendKafkaMessage(text string) {
 
 	conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	_, err = conn.WriteMessages(
-		kafka.Message{Value: []byte(`{"Nikolaj": "Wonder Why!"}`)},
-		kafka.Message{Value: []byte(`{"Katrine": "C# is better!"}`)},
-		kafka.Message{Value: []byte(`{"Oliver": "Not with this library!"}`)},
+		kafka.Message{Value: data},
 	)
+	log.Println(data)
 	if err != nil {
 		log.Fatal("failed to write messages:", err)
 	}
-
 	if err := conn.Close(); err != nil {
 		log.Fatal("failed to close writer:", err)
 	}
+	log.Println("Data Send, now is Katrines problem")
 }
 func main() {
 
@@ -116,42 +115,54 @@ func main() {
 	check(err, "Could not open file")
 	check(err, "unable to parse schema") // Handle the error properly
 
-//	sendKafkaMessage("test")
+	//	sendKafkaMessage("test")
 	questionSchema, err := os.ReadFile("pqSchema.avsc")
 	postSchema, err := os.ReadFile("postSchema.avsc")
 	ocfFile, err := os.Create("pp.avro")
 	cfFile, err := os.Create("pq.avro")
 	check(err, "cannot create Avro file")
 	defer ocfFile.Close()
-    postWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
-        W:      ocfFile,
-        Schema: string(postSchema), // Use string(avroSchema) here
-    })
-    questionWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
-        W:      cfFile,
-        Schema: string(questionSchema), // Use string(avroSchema) here
-    })
+	postCodec, err := goavro.NewCodec(string(postSchema))
+	check(err, "Could not create Codec")
+	questionCodec, err := goavro.NewCodec(string(questionSchema))
+	check(err, "Could not create Codec")
+	postWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
+		W:      ocfFile,
+		Schema: string(postSchema), // Use string(avroSchema) here
+	})
+	questionWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
+		W:      cfFile,
+		Schema: string(questionSchema), // Use string(avroSchema) here
+	})
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10; i++ {
 		line, _ := popLine(file)
-
-//		fmt.Println(string(line[:]))
+		//		fmt.Println(string(line[:]))
 		data := &Post{}
 		error := xml.Unmarshal(line, data)
 		if nil != error {
 			fmt.Println("Error unmarshalling from XML", err)
 			return
 		}
+
 		native := structs.Map(data)
 		check(err, "cannot convert to map")
 
 		// Append the data to the OCF writer
 		if data.PostTypeId == 1 {
 			err = questionWriter.Append([]map[string]interface{}{native})
+			binary, err := questionCodec.BinaryFromNative(nil, structs.Map(data))
+			check(err, "could not convert QuestionData")
+			sendKafkaMessage(binary, "INGESTION")
 		} else {
 			err = postWriter.Append([]map[string]interface{}{native})
+
+			binary, err := postCodec.BinaryFromNative(nil, structs.Map(data))
+			check(err, "could not convert PostData")
+			sendKafkaMessage(binary, "ingestion2")
 		}
 		check(err, "cannot append data to OCF writer")
 		// You can write this to a file, send it over a network, etc.
 	}
 }
+
