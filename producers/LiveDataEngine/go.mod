@@ -3,6 +3,7 @@ module ingestion/avro
 go 1.22.9
 
 require (
+	github.com/confluentinc/confluent-kafka-go/v2 v2.6.1 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/hamba/avro/v2 v2.27.0 // indirect
