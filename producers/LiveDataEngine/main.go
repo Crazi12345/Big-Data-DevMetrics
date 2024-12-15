@@ -12,8 +12,6 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/fatih/structs"
-	"github.com/linkedin/goavro/v2"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -112,9 +110,6 @@ func popLine(f *os.File) ([]byte, error) {
 func sendKafkaMessage(data []byte, topic string) {
 
 	partition := 0
-
-	//file, err := os.ReadFile("pp.avro")
-	//log.Println(data)
 	conn, err := kafka.DialLeader(context.Background(), "tcp", "kafka:9092", topic, partition)
 	if err != nil {
 		log.Fatal("failed to dial leader:", err)
@@ -136,31 +131,9 @@ func main() {
 
 	file, err := os.OpenFile("test.xml", os.O_CREATE|os.O_RDWR, 0644)
 	check(err, "Could not open file")
-	check(err, "unable to parse schema") // Handle the error properly
-
-	//	sendKafkaMessage("test")
-	questionSchema, err := os.ReadFile("pqSchema.avsc")
-	postSchema, err := os.ReadFile("postSchema.avsc")
-	ocfFile, err := os.Create("pp.avro")
-	cfFile, err := os.Create("pq.avro")
-	check(err, "cannot create Avro file")
-	defer ocfFile.Close()
-	//postCodec, err := goavro.NewCodec(string(postSchema))
-	check(err, "Could not create Codec")
-	//questionCodec, err := goavro.NewCodec(string(questionSchema))
-	check(err, "Could not create Codec")
-	postWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
-		W:      ocfFile,
-		Schema: string(postSchema), // Use string(avroSchema) here
-	})
-	questionWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
-		W:      cfFile,
-		Schema: string(questionSchema), // Use string(avroSchema) here
-	})
 
 	for i := 0; i < 10; i++ {
 		line, _ := popLine(file)
-		//		fmt.Println(string(line[:]))
 		data := &Post{}
 		error := xml.Unmarshal(line, data)
 		if nil != error {
@@ -170,25 +143,12 @@ func main() {
 
 		jsonData, err := json.Marshal(data)
 		check(err, "could not make to jj")
-		native := structs.Map(data)
 		check(err, "cannot convert to map")
 
-		log.Println(data.Tags)
-		// Append the data to the OCF writer
 		if data.PostTypeId == 1 {
-			err = questionWriter.Append([]map[string]interface{}{native})
-			//binary, err := questionCodec.BinaryFromNative(nil, structs.Map(data))
-			check(err, "could not convert QuestionData")
 			sendKafkaMessage(jsonData, "INGESTION")
 		} else {
-			err = postWriter.Append([]map[string]interface{}{native})
-
-			//binary, err := postCodec.BinaryFromNative(nil, structs.Map(data))
-			check(err, "could not convert PostData")
 			sendKafkaMessage(jsonData, "ingestion2")
 		}
-		check(err, "cannot append data to OCF writer")
-		// You can write this to a file, send it over a network, etc.
 	}
 }
-
