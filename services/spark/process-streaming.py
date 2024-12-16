@@ -1,11 +1,10 @@
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
-from pyspark.sql.avro.functions import to_avro
 from src.utils import SPARK_ENV, get_spark_context
 
 if __name__ == "__main__":
     additional_conf = {
-        "spark.jars.packages": "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.2,org.apache.spark:spark-avro_2.13:3.5.3"
+        "spark.jars.packages": "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.2"
     }
     spark = get_spark_context(
         app_name="Kafka Streamning", 
@@ -90,17 +89,13 @@ if __name__ == "__main__":
     .select(F.col("parsed_value.*"))
 
     #Example filtering
-    questions_df = parsed_df.filter(F.col("PostTypeId")==1).select("Id","CreationDate","Score","Title","Tags")
+    questions_df = parsed_df.filter(F.col("PostTypeId")==1).select("Id","Score","OwnerUserId")
 
     posts_df = parsed_df.filter(F.col("PostTypeId") != 1)
 
-    #Write to console for debugging
-    query = questions_df.writeStream.outputMode("append").format("console").start()
-
-    query.awaitTermination()
-
+    
     #Serializing as avro (only if we want to send to kafka as avro)
-    questions_df = questions_df.withColumn("value",to_avro(F.struct(
+    """questions_df = questions_df.withColumn("value",to_avro(F.struct(
         "Id",
         "PostTypeId",
         "AcceptedAnswerId",
@@ -118,44 +113,34 @@ if __name__ == "__main__":
         "FavoriteCount",
         "ContentLicense"
     ),avro_schema))
-    
+    """
     #Serializing as JSON (only if we want to send to kafka as json)
-    """questions_df = questions_df.withColumn("value",F.to_json(F.struct(
+    questions_df = questions_df.withColumn("value",F.to_json(F.struct(
         "Id",
-        "PostTypeId",
-        "AcceptedAnswerId",
-        "CreationDate",
         "Score",
-        "ViewCount",
-        "OwnerUserId",
-        "LastEditorUserId",
-        "LastEditDate",
-        "LastActivityDate",
-        "Title",
-        "Tags",
-        "AnswerCount",
-        "CommentCount",
-        "FavoriteCount",
-        "ContentLicense"
-    )))"""
+        "OwnerUserId"
+    )))
 
     #Send back to kafka (to topic called "PROCESSED_QUESTIONS")
     #JSON
-    """
-    questions_df.selectExpr("CAST(Id as STRING) as key","value")\
+    
+    query = questions_df.selectExpr("CAST(Id as STRING) as key","value")\
     .writeStream\
     .format("kafka")\
     .option("kafka.bootstrap.servers","kafka:9092")\
     .option("topic","PROCESSED_DATA")\
+    .option("checkpointLocation","/tmp")\
     .start()
-    """
+    
 
     #As AVRO
+    """
     questions_df.selectExpr("CAST(Id AS STRING) as key", "value") \
     .writeStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9092") \
     .option("topic", "PROCESSED_DATA") \
     .start()
+    """
 
-    spark.stop()
+    query.awaitTermination()
