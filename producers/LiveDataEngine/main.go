@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -125,14 +126,21 @@ func sendKafkaMessage(data []byte, topic string) {
 	if err := conn.Close(); err != nil {
 		log.Fatal("failed to close writer:", err)
 	}
-	log.Println("Data Send, now is Katrines problem")
 }
 func main() {
 
 	file, err := os.OpenFile("test.xml", os.O_CREATE|os.O_RDWR, 0644)
 	check(err, "Could not open file")
+	ingestSize := 0
+	if os.Args[1] == "" {
 
-	for i := 0; i < 10; i++ {
+		ingestSize = 10
+	} else {
+		ingestSize, err = strconv.Atoi(os.Args[1])
+        check(err, "could not convert number")
+	}
+
+	for i := 0; i < ingestSize; i++ {
 		line, _ := popLine(file)
 		data := &Post{}
 		error := xml.Unmarshal(line, data)
@@ -142,8 +150,7 @@ func main() {
 		}
 
 		jsonData, err := json.Marshal(data)
-		check(err, "could not make to jj")
-		check(err, "cannot convert to map")
+		check(err, "could not make to json file")
 
 		if data.PostTypeId == 1 {
 			sendKafkaMessage(jsonData, "INGESTION")

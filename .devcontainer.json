@@ -1,0 +1,6 @@
+{
+    "image": "mcr.microsoft.com/devcontainer/go",
+    "features": {
+        "ghcr.io/devcontainers-extra/features/neovim-apt-get:1": {}
+    }
+}
