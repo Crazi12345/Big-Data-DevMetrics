@@ -12,8 +12,6 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/fatih/structs"
-	"github.com/linkedin/goavro/v2"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -39,6 +37,21 @@ type Post struct {
 	FavoriteCount         int    `json:"FavoriteCount" xml:"FavoriteCount,attr" avro:"favoriteCount"`
 	CommunityOwnedDate    string `json:"CommunityOwnedDate" xml:"CommunityOwnedDate,attr" avro:"communityOwnedDate"`
 	ContentLicense        string `json:"ContentLicense" xml:"ContentLicense,attr" avro:"contentLicense"`
+}
+
+type User struct {
+	Id             int    `json:"Id"`
+	Reputation     int    `json:"Reputation"`
+	CreationDate   string `json:"CreationDate"`
+	DisplayName    string `json:"DisplayName"`
+	LastAccessDate string `json:"LastAccessDate"`
+	AboutMe        string `json:"AboutMe"`
+	Views          int    `json:"Views"`
+	UpVotes        int    `json:"UpVotes"`
+	DownVotes      int    `json:"DownVotes"`
+	AccountId      int    `json:"AccountId,omitempty"`  // Optional field
+	WebsiteUrl     string `json:"WebsiteUrl,omitempty"` // Optional field
+	Location       string `json:"Location,omitempty"`   // Optional field
 }
 
 func check(e error, message string) {
@@ -81,29 +94,6 @@ func popLine(f *os.File) ([]byte, error) {
 
 	err = f.Truncate(newSize)
 	check(err, "truncating failed")
-	type Post struct {
-		Id                    int    `json:"Id" xml:"Id,attr" avro:"Id"`
-		PostTypeId            int    `json:"PostTypeId" xml:"PostTypeId,attr" avro:"postTypeId"`
-		ParentId              int    `json:"ParentId" xml:"ParentId,attr" avro:"parentId"`
-		AcceptedAnswerId      int    `json:"AcceptedAnswerId" xml:"AcceptedAnswerId,attr" avro:"acceptedAnswerId"`
-		CreationDate          string `json:"CreationDate" xml:"CreationDate,attr" avro:"creationDate"`
-		Score                 int    `json:"Score" xml:"Score,attr" avro:"score"`
-		ViewCount             int    `json:"ViewCount" xml:"ViewCount,attr" avro:"viewCount"`
-		Body                  string `json:"Body" xml:"Body,attr" avro:"body"`
-		OwnerUserId           int    `json:"OwnerUserId" xml:"OwnerUserId,attr" avro:"ownerUserId"`
-		OwnerDisplayName      string `json:"OwnerDisplayName" xml:"OwnerDisplayName,attr" avro:"ownerDisplayName"`
-		LastEditorUserId      int    `json:"LastEditorUserId" xml:"LastEditorUserId,attr" avro:"lastEditorUserId"`
-		LastEditorDisplayName string `json:"LastEditorDisplayName" xml:"LastEditorDisplayName,attr" avro:"lastEditorDisplayName"`
-		LastEditDate          string `json:"LastEditDate" xml:"LastEditDate,attr" avro:"lastEditDate"`
-		LastActivityDate      string `json:"LastActivityDate" xml:"LastActivityDate,attr" avro:"lastActivityDate"`
-		Title                 string `json:"Title" xml:"Title,attr" avro:"title"`
-		Tags                  string `json:"Tags" xml:"Tags,attr" avro:"tags"`
-		AnswerCount           int    `json:"AnswerCount" xml:"AnswerCount,attr" avro:"answerCount"`
-		CommentCount          int    `json:"CommentCount" xml:"CommentCount,attr" avro:"commentCount"`
-		FavoriteCount         int    `json:"FavoriteCount" xml:"FavoriteCount,attr" avro:"favoriteCount"`
-		CommunityOwnedDate    string `json:"CommunityOwnedDate" xml:"CommunityOwnedDate,attr" avro:"communityOwnedDate"`
-		ContentLicense        string `json:"ContentLicense" xml:"ContentLicense,attr" avro:"contentLicense"`
-	}
 	err = f.Sync()
 	check(err, "syncing failed")
 	return line, nil
@@ -112,9 +102,6 @@ func popLine(f *os.File) ([]byte, error) {
 func sendKafkaMessage(data []byte, topic string) {
 
 	partition := 0
-
-	//file, err := os.ReadFile("pp.avro")
-	//log.Println(data)
 	conn, err := kafka.DialLeader(context.Background(), "tcp", "kafka:9092", topic, partition)
 	if err != nil {
 		log.Fatal("failed to dial leader:", err)
@@ -130,65 +117,45 @@ func sendKafkaMessage(data []byte, topic string) {
 	if err := conn.Close(); err != nil {
 		log.Fatal("failed to close writer:", err)
 	}
-	log.Println("Data Send, now is Katrines problem")
 }
-func main() {
+func ingest(ingestSize int, file *os.File, data interface{}) {
 
-	file, err := os.OpenFile("test.xml", os.O_CREATE|os.O_RDWR, 0644)
-	check(err, "Could not open file")
-	check(err, "unable to parse schema") // Handle the error properly
-
-	//	sendKafkaMessage("test")
-	questionSchema, err := os.ReadFile("pqSchema.avsc")
-	postSchema, err := os.ReadFile("postSchema.avsc")
-	ocfFile, err := os.Create("pp.avro")
-	cfFile, err := os.Create("pq.avro")
-	check(err, "cannot create Avro file")
-	defer ocfFile.Close()
-	//postCodec, err := goavro.NewCodec(string(postSchema))
-	check(err, "Could not create Codec")
-	//questionCodec, err := goavro.NewCodec(string(questionSchema))
-	check(err, "Could not create Codec")
-	postWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
-		W:      ocfFile,
-		Schema: string(postSchema), // Use string(avroSchema) here
-	})
-	questionWriter, err := goavro.NewOCFWriter(goavro.OCFConfig{
-		W:      cfFile,
-		Schema: string(questionSchema), // Use string(avroSchema) here
-	})
-
-	for i := 0; i < 10; i++ {
+	for i := 0; i < ingestSize; i++ {
 		line, _ := popLine(file)
-		//		fmt.Println(string(line[:]))
-		data := &Post{}
-		error := xml.Unmarshal(line, data)
-		if nil != error {
+		err := xml.Unmarshal(line, data)
+		if nil != err {
 			fmt.Println("Error unmarshalling from XML", err)
 			return
 		}
 
 		jsonData, err := json.Marshal(data)
-		check(err, "could not make to jj")
-		native := structs.Map(data)
-		check(err, "cannot convert to map")
+		check(err, "could not make to json file")
 
-		log.Println(data.Tags)
-		// Append the data to the OCF writer
-		if data.PostTypeId == 1 {
-			err = questionWriter.Append([]map[string]interface{}{native})
-			//binary, err := questionCodec.BinaryFromNative(nil, structs.Map(data))
-			check(err, "could not convert QuestionData")
-			sendKafkaMessage(jsonData, "INGESTION")
-		} else {
-			err = postWriter.Append([]map[string]interface{}{native})
-
-			//binary, err := postCodec.BinaryFromNative(nil, structs.Map(data))
-			check(err, "could not convert PostData")
-			sendKafkaMessage(jsonData, "ingestion2")
+		switch data.(type) {
+		case *User:
+			sendKafkaMessage(jsonData, "Users")
+		case *Post:
+			dada := &Post{}
+			if dada.PostTypeId == 1 {
+				sendKafkaMessage(jsonData, "Post")
+			} else {
+				sendKafkaMessage(jsonData, "Question")
+			}
 		}
-		check(err, "cannot append data to OCF writer")
-		// You can write this to a file, send it over a network, etc.
 	}
 }
+func main() {
 
+	option1, err := os.OpenFile("test.xml", os.O_CREATE|os.O_RDWR, 0644)
+	option2, err := os.OpenFile("testuser.xml", os.O_CREATE|os.O_RDWR, 0644)
+	check(err, "Could not open file")
+
+	if os.Args[1] == "user" {
+		data := &User{}
+		ingest(1000, option2, data)
+	} else if os.Args[1] == "posts" {
+
+		data := &Post{}
+		ingest(1000, option1, data)
+	}
+}
