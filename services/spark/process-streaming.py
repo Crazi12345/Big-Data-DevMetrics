@@ -16,38 +16,17 @@ if __name__ == "__main__":
     kafka_options = {
         "kafka.bootstrap.servers": "kafka:9092",
         "startingOffsets": "earliest",  # Start from the beginning when we consume from kafka
-        "subscribe": "INGESTION",  # Our topic name
+        "subscribe": "Question,Users",  # Our topic name
+        "failOnDataLoss": "false"
     }
 
+    #Read data from kafka
     df = spark.readStream.format("kafka").options(**kafka_options).load()
-    deserialized_df = df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
+    
+    #Extract key, value, and topic
+    df = df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)","topic")
 
-    deserialized_df.printSchema()
-
-    avro_schema = """
-    {
-        "type": "record",
-        "name": "Question",
-        "fields": [
-        { "name": "Id", "type": "int" },
-        { "name": "PostTypeId", "type": "int" },
-        { "name": "AcceptedAnswerId", "type": "int" },
-        { "name": "CreationDate", "type": "string" },
-        { "name": "Score", "type": "int" },
-        { "name": "ViewCount", "type": "int" },
-        { "name": "OwnerUserId", "type": "int" },
-        { "name": "LastEditorUserId", "type": "int" },
-        { "name": "LastEditDate", "type": "string" },
-        { "name": "LastActivityDate", "type": "string" },
-        { "name": "Title", "type": "string" },
-        { "name": "Tags", "type": "string" },
-        { "name": "AnswerCount", "type": "int" },
-        { "name": "CommentCount", "type": "int" },
-        { "name": "FavoriteCount", "type": "int" },
-        { "name": "ContentLicense", "type": "string" }
-        ]
-    }
-    """
+    df.printSchema()
 
     post_schema = T.StructType([
         T.StructField("Id", T.IntegerType(), True),
@@ -84,63 +63,86 @@ if __name__ == "__main__":
         T.StructField("ContentLicense", T.StringType(), True)
     ])
     
-    #Parse JSON messages
+    user_schema = T.StructType([
+        T.StructField("Id", T.IntegerType(), True),
+        T.StructField("Reputation", T.IntegerType(), True),
+        T.StructField("CreationDate", T.StringType(), True),
+        T.StructField("DisplayName", T.StringType(), True),
+        T.StructField("LastAccessDate", T.StringType(), True),
+        T.StructField("AboutMe", T.StringType(), True),
+        T.StructField("Views", T.IntegerType(), True),
+        T.StructField("UpVotes", T.IntegerType(), True),
+        T.StructField("DownVotes", T.IntegerType(), True),
+        T.StructField("AccountId", T.IntegerType(), True),
+        T.StructField("WebsiteUrl", T.StringType(), True),
+        T.StructField("Location", T.StringType(), True)
+    ])
+
+
+    questions_df = df.filter(F.col("topic") == "Question") \
+        .withColumn("parsed_value", F.from_json(F.col("value"), question_schema)) \
+        .select(F.col("parsed_value.*"))
+    
+    users_df = df.filter(F.col("topic") == "Users") \
+        .withColumn("parsed_value", F.from_json(F.col("value"), user_schema)) \
+        .select(F.col("parsed_value.*"))
+    
+    # Filter questions and join with users based on OwnerUserId
+    question_user_df = questions_df.filter(F.col("PostTypeId") == 1).alias("q") \
+        .join(users_df.alias("u"), F.col("q.OwnerUserId") == F.col("u.Id"), "inner") \
+        .select(
+            F.col("q.Id").alias("QuestionId"),
+            F.col("q.Tags"),
+            F.col("u.Location").alias("UserLocation")
+        )
+    
+    result_df = question_user_df.withColumn("value", F.to_json(F.struct(
+        "QuestionId",
+        "Tags",
+        "UserLocation"
+    )))
+
+
+    """
+    #Parse and deserialize post data
     parsed_df = deserialized_df.withColumn("parsed_value",F.from_json(F.col("value"),post_schema))\
     .select(F.col("parsed_value.*"))
 
+    # Parse and deserialize user data
+    users_df = deserialized_df.withColumn("parsed_user_value", F.from_json(F.col("value"), user_schema))\
+        .select(F.col("parsed_user_value.*"))
+
+    # Parse and deserialize question data
+    questions_df = deserialized_df.withColumn("parsed_question_value", F.from_json(F.col("value"), question_schema))\
+        .select(F.col("parsed_question_value.*"))
+
     #Example filtering
-    questions_df = parsed_df.filter(F.col("PostTypeId")==1).select("Id","Score","OwnerUserId")
-
-    posts_df = parsed_df.filter(F.col("PostTypeId") != 1)
+    #questions_df = parsed_df.filter(F.col("PostTypeId")==1).select("Id","Score","OwnerUserId")
+    # Filter questions (PostTypeId == 1 for questions) and join with users
+    question_user_df = questions_df.filter(F.col("PostTypeId") == 1).alias("q") \
+    .join(users_df.alias("u"), F.col("q.OwnerUserId") == F.col("u.Id"), "inner") \
+    .select(
+        F.col("q.Id").alias("QuestionId"),
+        F.col("q.Tags"),
+        F.col("u.Location").alias("UserLocation")
+    )
 
     
-    #Serializing as avro (only if we want to send to kafka as avro)
-    """questions_df = questions_df.withColumn("value",to_avro(F.struct(
-        "Id",
-        "PostTypeId",
-        "AcceptedAnswerId",
-        "CreationDate",
-        "Score",
-        "ViewCount",
-        "OwnerUserId",
-        "LastEditorUserId",
-        "LastEditDate",
-        "LastActivityDate",
-        "Title",
-        "Tags",
-        "AnswerCount",
-        "CommentCount",
-        "FavoriteCount",
-        "ContentLicense"
-    ),avro_schema))
-    """
     #Serializing as JSON (only if we want to send to kafka as json)
-    questions_df = questions_df.withColumn("value",F.to_json(F.struct(
-        "Id",
-        "Score",
-        "OwnerUserId"
+    result_df = question_user_df.withColumn("value", F.to_json(F.struct(
+    "QuestionId",
+    "Tags",
+    "UserLocation"
     )))
-
-    #Send back to kafka (to topic called "PROCESSED_QUESTIONS")
+    """
+    #Send back to kafka (to topic called "PROCESSED_DATA_USERS")
     #JSON
-    
-    query = questions_df.selectExpr("CAST(Id as STRING) as key","value")\
+    query = result_df.selectExpr("CAST(QuestionId as STRING) as key","value")\
     .writeStream\
     .format("kafka")\
     .option("kafka.bootstrap.servers","kafka:9092")\
-    .option("topic","PROCESSED_DATA")\
-    .option("checkpointLocation","/tmp")\
+    .option("topic","PROCESSED_DATA_USERS")\
+    .option("checkpointLocation","/tmp/checkpoint1")\
     .start()
-    
-
-    #As AVRO
-    """
-    questions_df.selectExpr("CAST(Id AS STRING) as key", "value") \
-    .writeStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", "kafka:9092") \
-    .option("topic", "PROCESSED_DATA") \
-    .start()
-    """
 
     query.awaitTermination()

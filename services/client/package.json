@@ -7,6 +7,7 @@
         "start": "node client.js"
     },
     "dependencies": {
+        "client": "file:",
         "express": "^4.21.1",
         "heatmap.js": "^2.0.5",
         "leaflet": "^1.9.4",
