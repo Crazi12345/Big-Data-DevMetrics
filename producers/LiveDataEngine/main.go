@@ -6,13 +6,12 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"github.com/segmentio/kafka-go"
 	"io"
 	"log"
 	"os"
 	"os/exec"
 	"time"
-
-	"github.com/segmentio/kafka-go"
 )
 
 type Post struct {
@@ -30,8 +29,6 @@ type Post struct {
 	LastEditorDisplayName string `json:"LastEditorDisplayName" xml:"LastEditorDisplayName,attr" avro:"lastEditorDisplayName"`
 	LastEditDate          string `json:"LastEditDate" xml:"LastEditDate,attr" avro:"lastEditDate"`
 	LastActivityDate      string `json:"LastActivityDate" xml:"LastActivityDate,attr" avro:"lastActivityDate"`
-	Title                 string `json:"Title" xml:"Title,attr" avro:"title"`
-	Tags                  string `json:"Tags" xml:"Tags,attr" avro:"tags"`
 	AnswerCount           int    `json:"AnswerCount" xml:"AnswerCount,attr" avro:"answerCount"`
 	CommentCount          int    `json:"CommentCount" xml:"CommentCount,attr" avro:"commentCount"`
 	FavoriteCount         int    `json:"FavoriteCount" xml:"FavoriteCount,attr" avro:"favoriteCount"`
@@ -52,6 +49,11 @@ type User struct {
 	AccountId      int    `json:"AccountId,omitempty"`  // Optional field
 	WebsiteUrl     string `json:"WebsiteUrl,omitempty"` // Optional field
 	Location       string `json:"Location,omitempty"`   // Optional field
+}
+
+type Country struct {
+	Country    string `json:"country"`
+	Population int    `json:"population"`
 }
 
 func check(e error, message string) {
@@ -127,15 +129,19 @@ func ingest(ingestSize int, file *os.File, data interface{}) {
 			fmt.Println("Error unmarshalling from XML", err)
 			return
 		}
-
-		jsonData, err := json.Marshal(data)
-		check(err, "could not make to json file")
-
 		switch data.(type) {
 		case *User:
+			dada := &User{}
+            localfile,_ :=os.OpenFile("locations.txt",os.O_APPEND, 0644)
+            local,err:=popLine(localfile)
+			dada.Location = string(local)
+			jsonData, err := json.Marshal(dada)
+			check(err, "could not make to json file")
 			sendKafkaMessage(jsonData, "Users")
 		case *Post:
 			dada := &Post{}
+			jsonData, err := json.Marshal(dada)
+			check(err, "could not make to json file")
 			if dada.PostTypeId == 1 {
 				sendKafkaMessage(jsonData, "Post")
 			} else {
@@ -147,15 +153,10 @@ func ingest(ingestSize int, file *os.File, data interface{}) {
 func main() {
 
 	option1, err := os.OpenFile("test.xml", os.O_CREATE|os.O_RDWR, 0644)
-	option2, err := os.OpenFile("testuser.xml", os.O_CREATE|os.O_RDWR, 0644)
+	//	option2, err := os.OpenFile("testUsers.xml", os.O_CREATE|os.O_RDWR, 0644)
 	check(err, "Could not open file")
-
-	if os.Args[1] == "user" {
-		data := &User{}
-		ingest(1000, option2, data)
-	} else if os.Args[1] == "posts" {
-
-		data := &Post{}
-		ingest(1000, option1, data)
-	}
+	//	data := &User{}
+	//	ingest(1000, option2, data, countries, weights)
+	data := &Post{}
+	ingest(1000, option1, data)
 }
