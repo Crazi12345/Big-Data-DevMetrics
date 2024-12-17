@@ -15,132 +15,88 @@ if __name__ == "__main__":
 
     kafka_options = {
         "kafka.bootstrap.servers": "kafka:9092",
-        "startingOffsets": "earliest",  # Start from the beginning when we consume from kafka
-        "subscribe": "INGESTION",  # Our topic name
+        "startingOffsets": "earliest",  
+        "subscribe": "JOINED_STREAM",  
     }
 
     df = spark.readStream.format("kafka").options(**kafka_options).load()
     deserialized_df = df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
-
-    deserialized_df.printSchema()
-
-    avro_schema = """
-    {
-        "type": "record",
-        "name": "Question",
-        "fields": [
-        { "name": "Id", "type": "int" },
-        { "name": "PostTypeId", "type": "int" },
-        { "name": "AcceptedAnswerId", "type": "int" },
-        { "name": "CreationDate", "type": "string" },
-        { "name": "Score", "type": "int" },
-        { "name": "ViewCount", "type": "int" },
-        { "name": "OwnerUserId", "type": "int" },
-        { "name": "LastEditorUserId", "type": "int" },
-        { "name": "LastEditDate", "type": "string" },
-        { "name": "LastActivityDate", "type": "string" },
-        { "name": "Title", "type": "string" },
-        { "name": "Tags", "type": "string" },
-        { "name": "AnswerCount", "type": "int" },
-        { "name": "CommentCount", "type": "int" },
-        { "name": "FavoriteCount", "type": "int" },
-        { "name": "ContentLicense", "type": "string" }
-        ]
-    }
-    """
-
-    post_schema = T.StructType([
-        T.StructField("Id", T.IntegerType(), True),
-        T.StructField("PostTypeId", T.IntegerType(), True),
-        T.StructField("ParentId", T.IntegerType(), True),
-        T.StructField("CreationDate", T.StringType(), True),
-        T.StructField("Score", T.IntegerType(), True),
-        T.StructField("OwnerUserId", T.IntegerType(), True),
-        T.StructField("LastEditorUserId", T.IntegerType(), True),
-        T.StructField("LastEditorDisplayName", T.StringType(), True),
-        T.StructField("LastEditDate", T.StringType(), True),
-        T.StructField("LastActivityDate", T.StringType(), True),
-        T.StructField("CommentCount", T.IntegerType(), True),
-        T.StructField("CommunityOwnedDate", T.StringType(), True),
-        T.StructField("ContentLicense", T.StringType(), True)
-    ])
-
-    question_schema = T.StructType([
-        T.StructField("Id", T.IntegerType(), True),
-        T.StructField("PostTypeId", T.IntegerType(), True),
-        T.StructField("AcceptedAnswerId", T.IntegerType(), True),
-        T.StructField("CreationDate", T.StringType(), True),
-        T.StructField("Score", T.IntegerType(), True),
-        T.StructField("ViewCount", T.IntegerType(), True),
-        T.StructField("OwnerUserId", T.IntegerType(), True),
-        T.StructField("LastEditorUserId", T.IntegerType(), True),
-        T.StructField("LastEditDate", T.StringType(), True),
-        T.StructField("LastActivityDate", T.StringType(), True),
-        T.StructField("Title", T.StringType(), True),
-        T.StructField("Tags", T.StringType(), True),
-        T.StructField("AnswerCount", T.IntegerType(), True),
-        T.StructField("CommentCount", T.IntegerType(), True),
-        T.StructField("FavoriteCount", T.IntegerType(), True),
-        T.StructField("ContentLicense", T.StringType(), True)
-    ])
     
+    data_schema = T.StructType([
+        T.StructField("USERID", T.IntegerType(), True),
+        T.StructField("QUESTIONID", T.IntegerType(), True),
+        T.StructField("POSTTYPEID", T.IntegerType(), True),
+        T.StructField("QUESTIONCREATIONDATE", T.StringType(), True),
+        T.StructField("QUESTIONVIEWCOUNT", T.IntegerType(), True),
+        T.StructField("QUESTIONTAGS", T.StringType(), True),
+        T.StructField("USERREPUTATION", T.IntegerType(), True),
+        T.StructField("USERLASTACCESSDATE", T.StringType(), True),
+        T.StructField("USERLOCATION", T.StringType(), True)
+    ])
+
     #Parse JSON messages
-    parsed_df = deserialized_df.withColumn("parsed_value",F.from_json(F.col("value"),post_schema))\
+    parsed_df = deserialized_df.withColumn("parsed_value",F.from_json(F.col("value"),data_schema))\
     .select(F.col("parsed_value.*"))
 
-    #Example filtering
-    questions_df = parsed_df.filter(F.col("PostTypeId")==1).select("Id","Score","OwnerUserId")
+    #Get location count
+    location_count_df = parsed_df.groupBy("USERLOCATION").agg(F.count("USERLOCATION").alias("LocationCount"))
 
-    posts_df = parsed_df.filter(F.col("PostTypeId") != 1)
+    #Split tags on | and remove empty
+    tags_exploded_df = parsed_df.withColumn("Tag",F.explode(F.split(F.col("QUESTIONTAGS"),"\\|")))\
+    .filter(F.col("Tag") != "") 
 
-    
-    #Serializing as avro (only if we want to send to kafka as avro)
-    """questions_df = questions_df.withColumn("value",to_avro(F.struct(
-        "Id",
-        "PostTypeId",
-        "AcceptedAnswerId",
-        "CreationDate",
-        "Score",
-        "ViewCount",
-        "OwnerUserId",
-        "LastEditorUserId",
-        "LastEditDate",
-        "LastActivityDate",
-        "Title",
-        "Tags",
-        "AnswerCount",
-        "CommentCount",
-        "FavoriteCount",
-        "ContentLicense"
-    ),avro_schema))
-    """
+    #Count tag occurrence by location
+    tag_count_location_df = tags_exploded_df.groupBy("USERLOCATION","Tag").agg(F.count("Tag").alias("TagCountByLocation"))
+
+    #Get tag count
+    tag_count_df = tags_exploded_df.groupBy("Tag").agg(F.count("Tag").alias("TagCount"))
+
     #Serializing as JSON (only if we want to send to kafka as json)
-    questions_df = questions_df.withColumn("value",F.to_json(F.struct(
-        "Id",
-        "Score",
-        "OwnerUserId"
+    
+    location_count_df = location_count_df.withColumn("value",F.to_json(F.struct(
+        "USERLOCATION",
+        "LocationCount"
     )))
 
-    #Send back to kafka (to topic called "PROCESSED_QUESTIONS")
+    tag_count_df = tag_count_df.withColumn("value",F.to_json(F.struct(
+        "Tag",
+        "TagCount"
+    )))
+
+    tag_count_location_df = tag_count_location_df.withColumn("value",F.to_json(F.struct(
+        "USERLOCATION",
+        "Tag",
+        "TagCountByLocation"
+    )))
+
+    #Send back to kafka 
     #JSON
-    
-    query = questions_df.selectExpr("CAST(Id as STRING) as key","value")\
+    locationQuery = location_count_df.selectExpr("CAST(USERLOCATION as STRING) as key","value")\
     .writeStream\
+    .outputMode("update")\
     .format("kafka")\
     .option("kafka.bootstrap.servers","kafka:9092")\
-    .option("topic","PROCESSED_DATA")\
-    .option("checkpointLocation","/tmp")\
+    .option("topic","UserLocation_Counts")\
+    .option("checkpointLocation","/tmp/location_checkpoint")\
     .start()
-    
 
-    #As AVRO
-    """
-    questions_df.selectExpr("CAST(Id AS STRING) as key", "value") \
-    .writeStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", "kafka:9092") \
-    .option("topic", "PROCESSED_DATA") \
+
+    tagQuery = tag_count_df.selectExpr("CAST(Tag as STRING) as key","value")\
+    .writeStream\
+    .outputMode("update")\
+    .format("kafka")\
+    .option("kafka.bootstrap.servers","kafka:9092")\
+    .option("topic","Tag_Counts")\
+    .option("checkpointLocation","/tmp/tag_checkpoint")\
     .start()
-    """
 
-    query.awaitTermination()
+    tagLocationQuery = tag_count_location_df.selectExpr("CAST(USERLOCATION as STRING) as key","value")\
+    .writeStream\
+    .outputMode("update")\
+    .format("kafka")\
+    .option("kafka.bootstrap.servers","kafka:9092")\
+    .option("topic","TagLocation_Counts")\
+    .option("checkpointLocation","/tmp/tagLocation_checkpoint")\
+    .start()
+
+    spark.streams.awaitAnyTermination()
