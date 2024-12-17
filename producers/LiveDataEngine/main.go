@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/segmentio/kafka-go"
 	"io"
 	"log"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
+
+	"github.com/segmentio/kafka-go"
 )
 
 type Post struct {
@@ -37,18 +39,18 @@ type Post struct {
 }
 
 type User struct {
-	Id             int    `json:"Id"`
-	Reputation     int    `json:"Reputation"`
-	CreationDate   string `json:"CreationDate"`
-	DisplayName    string `json:"DisplayName"`
-	LastAccessDate string `json:"LastAccessDate"`
-	AboutMe        string `json:"AboutMe"`
-	Views          int    `json:"Views"`
-	UpVotes        int    `json:"UpVotes"`
-	DownVotes      int    `json:"DownVotes"`
-	AccountId      int    `json:"AccountId,omitempty"`  // Optional field
-	WebsiteUrl     string `json:"WebsiteUrl,omitempty"` // Optional field
-	Location       string `json:"Location,omitempty"`   // Optional field
+	Id             int    `json:"Id" xml:"Id,attr"` // Add xml:"Id,attr"
+	Reputation     int    `json:"Reputation" xml:"Reputation,attr"`
+	CreationDate   string `json:"CreationDate" xml:"CreationDate,attr"`
+	DisplayName    string `json:"DisplayName" xml:"DisplayName,attr"`
+	LastAccessDate string `json:"LastAccessDate" xml:"LastAccessDate,attr"`
+	AboutMe        string `json:"AboutMe" xml:"AboutMe,attr"`
+	Views          int    `json:"Views" xml:"Views,attr"`
+	UpVotes        int    `json:"UpVotes" xml:"UpVotes,attr"`
+	DownVotes      int    `json:"DownVotes" xml:"DownVotes,attr"`
+	AccountId      int    `json:"AccountId,omitempty" xml:"AccountId,attr"`
+	WebsiteUrl     string `json:"WebsiteUrl,omitempty" xml:"WebsiteUrl,attr"`
+	Location       string `json:"Location,omitempty"`
 }
 
 type Country struct {
@@ -124,22 +126,23 @@ func ingest(ingestSize int, file *os.File, data interface{}) {
 
 	for i := 0; i < ingestSize; i++ {
 		line, _ := popLine(file)
-		err := xml.Unmarshal(line, data)
-		if nil != err {
-			fmt.Println("Error unmarshalling from XML", err)
-			return
-		}
 		switch data.(type) {
 		case *User:
+			localfile, err := os.OpenFile("locations.txt", os.O_CREATE|os.O_RDWR, 0644)
+
 			dada := &User{}
-            localfile,_ :=os.OpenFile("locations.txt",os.O_APPEND, 0644)
-            local,err:=popLine(localfile)
+			erro := xml.Unmarshal(line, dada)
+			check(erro, "could not unmarshel XML")
+			local, err := popLine(localfile)
 			dada.Location = string(local)
+
 			jsonData, err := json.Marshal(dada)
 			check(err, "could not make to json file")
 			sendKafkaMessage(jsonData, "Users")
 		case *Post:
 			dada := &Post{}
+			err := xml.Unmarshal(line, dada)
+			check(err, "could not unmarshel XML")
 			jsonData, err := json.Marshal(dada)
 			check(err, "could not make to json file")
 			if dada.PostTypeId == 1 {
@@ -153,10 +156,25 @@ func ingest(ingestSize int, file *os.File, data interface{}) {
 func main() {
 
 	option1, err := os.OpenFile("test.xml", os.O_CREATE|os.O_RDWR, 0644)
-	//	option2, err := os.OpenFile("testUsers.xml", os.O_CREATE|os.O_RDWR, 0644)
-	check(err, "Could not open file")
-	//	data := &User{}
-	//	ingest(1000, option2, data, countries, weights)
-	data := &Post{}
-	ingest(1000, option1, data)
+	check(err, "test.xml could not be opened")
+	option2, err := os.OpenFile("testUsers.xml", os.O_CREATE|os.O_RDWR, 0644)
+	check(err, "testUsers.xml could not be opened")
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
+	data := &User{}
+	go func() {
+		defer wg.Done()
+		ingest(100000, option2, data)
+	}()
+
+	data2 := &Post{}
+	go func() {
+		defer wg.Done()
+		ingest(100000, option1, data2)
+	}()
+
+	wg.Wait()
+	fmt.Println("ingestion complete")
 }
