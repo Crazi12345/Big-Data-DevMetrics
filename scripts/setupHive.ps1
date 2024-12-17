@@ -11,5 +11,8 @@ helm install hive-postgresql \
   postgresql
 
 #Apply yaml files
-kubectl apply -f hive-metastore.yaml
-kubectl apply -f hive.yaml
+kubectl apply -f ../services/hive-metastore.yaml
+kubectl apply -f ../services/hive/hive.yaml
+
+#Portforward the UI
+# kubectl port-forward svc/hiveserver2 10002:10002
