@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-hive-api
+  labels:
+    app: flask-hive-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: flask-hive-api
+  template:
+    metadata:
+      labels:
+        app: flask-hive-api
+    spec:
+      containers:
+      - name: flask-hive-api
+        image: flask-hive-api:latest  
+        ports:
+        - containerPort: 5000
+        env:
+        - name: HIVE_HOST
+          value: "localhost"
+        - name: HIVE_PORT
+          value: "10000"
+        - name: HIVE_USER
+          value: "root"
+        - name: HIVE_DATABASE
+          value: "default"
