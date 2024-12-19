@@ -19,7 +19,7 @@ master:
     - name: SPARK_HOME
       value: /opt/bitnami/spark
 worker:
-  replicaCount: 2
+  replicaCount: 3
   resources:
     limits:
       cpu: 1
