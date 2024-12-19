@@ -12,6 +12,7 @@ if __name__ == "__main__":
         additional_conf=additional_conf
     )
     sc = spark.sparkContext
+    sc.setLocalProperty("spark.scheduler.pool","pool1")
 
     kafka_options = {
         "kafka.bootstrap.servers": "kafka:9092",
