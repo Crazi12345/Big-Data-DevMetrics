@@ -7,8 +7,7 @@ helm install --values ../services/spark/spark-values.yaml spark oci://registry-1
 #Manually delete if forced restart needed: 
 #kubectl delete pods -l app.kubernetes.io/name=spark
 
-#Setup port-forward - Overlaps with redpanda portforwarding
-#kubectl port-forward svc/spark-master-svc 8080:80 &
+#kubectl port-forward svc/spark-master-svc 9090:80 &
 
 
 
