@@ -49,19 +49,11 @@ if __name__ == "__main__":
     #Count tag occurrence by location
     tag_count_location_df = tags_exploded_df.groupBy("USERLOCATION","Tag").agg(F.count("Tag").alias("TagCountByLocation"))
 
-    #Get tag count
-    tag_count_df = tags_exploded_df.groupBy("Tag").agg(F.count("Tag").alias("TagCount"))
-
     #Serializing as JSON (only if we want to send to kafka as json)
     
     location_count_df = location_count_df.withColumn("value",F.to_json(F.struct(
         "USERLOCATION",
         "LocationCount"
-    )))
-
-    tag_count_df = tag_count_df.withColumn("value",F.to_json(F.struct(
-        "Tag",
-        "TagCount"
     )))
 
     tag_count_location_df = tag_count_location_df.withColumn("value",F.to_json(F.struct(
@@ -81,17 +73,7 @@ if __name__ == "__main__":
     .option("checkpointLocation","/tmp/location_checkpoint")\
     .start()
 
-
-    tagQuery = tag_count_df.selectExpr("CAST(Tag as STRING) as key","value")\
-    .writeStream\
-    .outputMode("update")\
-    .format("kafka")\
-    .option("kafka.bootstrap.servers","kafka:9092")\
-    .option("topic","Tag_Counts")\
-    .option("checkpointLocation","/tmp/tag_checkpoint")\
-    .start()
-
-    tagLocationQuery = tag_count_location_df.selectExpr("CAST(USERLOCATION as STRING) as key","value")\
+    tagLocationQuery = tag_count_location_df.selectExpr("CAST(Tag as STRING) as key","value")\
     .writeStream\
     .outputMode("update")\
     .format("kafka")\
