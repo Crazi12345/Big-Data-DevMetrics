@@ -1,6 +1,0 @@
-[
-    { "country": "United States", "developers": 5000, "languages": ["JavaScript", "Python", "Java"] },
-    { "country": "India", "developers": 4500, "languages": ["JavaScript", "Java", "Python"] },
-    { "country": "Brazil", "developers": 3000, "languages": ["Java", "Python", "C#"] }
-  ]
-  
