@@ -3,7 +3,7 @@ from pyhive import hive
 
 app = Flask(__name__)
 
-HIVE_HOST = 'localhost'
+HIVE_HOST = 'localhost' # on cluster use hiveserver2
 HIVE_PORT = 10000
 HIVE_USER = 'root'
 HIVE_DATABASE = 'default'
@@ -15,7 +15,7 @@ def get_hive_connection():
 def query_hive_api():
     # Default query or custom query passed as a parameter
     query = request.args.get('query', "SELECT * FROM users LIMIT 10")
-    
+
     try:
         conn = get_hive_connection()
         cursor = conn.cursor()
@@ -23,9 +23,9 @@ def query_hive_api():
 
         # Fetch results
         columns = [desc[0] for desc in cursor.description]
-        rows = [dict(zip(columns, row)) for row in cursor.fetchall()] 
+        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        return jsonify(rows) 
+        return jsonify(rows)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
